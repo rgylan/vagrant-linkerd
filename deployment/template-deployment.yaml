@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: template-service
+  labels:
+    app: template
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: template
+  template:
+    metadata:
+      labels:
+        app: template
+    spec:
+      containers:
+        - name: template
+          image: docker.io/rgylan74/template-service:v1
+          ports:
+            - containerPort: 8080
+          imagePullPolicy: IfNotPresent
+          resources:
+            requests:
+              cpu: "250m"
+              memory: 256Mi
+            limits:
+              cpu: "500m"
+              memory: 512Mi
