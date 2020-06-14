@@ -13,11 +13,31 @@ echo "[TASK 2] Install docker container engine"
 yum install -y -q yum-utils device-mapper-persistent-data lvm2 > /dev/null 2>&1
 yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo > /dev/null 2>&1
 yum install -y -q docker-ce >/dev/null 2>&1
+yum install -y -q socat >/dev/null 2>&1
+yum install -y -q conntrack-tools >/dev/null 2>&1
+
+echo "[TASK 2.1] Setup docker daemon"
+mkdir /etc/docker
+cat > /etc/docker/daemon.json <<EOF
+{
+  "exec-opts": ["native.cgroupdriver=systemd"],
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "100m"
+  },
+  "storage-driver": "overlay2",
+  "storage-opts": [
+    "overlay2.override_kernel_check=true"
+  ]
+}
+EOF
+mkdir -p /etc/systemd/system/docker.service.d
 
 # Enable docker service
 echo "[TASK 3] Enable and start docker service"
 systemctl enable docker >/dev/null 2>&1
-systemctl start docker
+systemctl daemon-reload
+systemctl restart docker
 
 # Disable SELinux
 echo "[TASK 4] Disable SELinux"
@@ -42,35 +62,46 @@ echo "[TASK 7] Disable and turn off SWAP"
 sed -i '/swap/d' /etc/fstab
 swapoff -a
 
-# Add yum repo file for Kubernetes
-echo "[TASK 8] Add yum repo file for kubernetes"
-cat >>/etc/yum.repos.d/kubernetes.repo<<EOF
-[kubernetes]
-name=Kubernetes
-baseurl=https://packages.cloud.google.com/yum/repos/kubernetes-el7-x86_64
-enabled=1
-gpgcheck=1
-repo_gpgcheck=1
-gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg
-        https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
-EOF
-
 # Install Kubernetes
-echo "[TASK 9] Install Kubernetes (kubeadm, kubelet and kubectl)"
-yum install -y -q kubeadm kubelet kubectl >/dev/null 2>&1
+echo "[TASK 8] Install Kubernetes (kubeadm, kubelet and kubectl)"
+#yum install -y -q kubeadm kubelet kubectl >/dev/null 2>&1
+CNI_VERSION="v0.8.2"
+mkdir -p /opt/cni/bin
+curl -sL "https://github.com/containernetworking/plugins/releases/download/${CNI_VERSION}/cni-plugins-linux-amd64-${CNI_VERSION}.tgz" | tar -C /opt/cni/bin -xz
+
+CRICTL_VERSION="v1.17.0"
+mkdir -p /opt/bin
+curl -sL "https://github.com/kubernetes-sigs/cri-tools/releases/download/${CRICTL_VERSION}/crictl-${CRICTL_VERSION}-linux-amd64.tar.gz" | tar -C /opt/bin -xz
+
+RELEASE="$(curl -sSL https://dl.k8s.io/release/stable.txt)"
+mkdir -p /opt/bin
+cd /opt/bin
+curl -sL --remote-name-all https://storage.googleapis.com/kubernetes-release/release/${RELEASE}/bin/linux/amd64/{kubeadm,kubelet,kubectl}
+mv ./kubeadm /usr/bin/kubeadm
+mv ./kubelet /usr/bin/kubelet
+mv ./kubectl /usr/bin/kubectl
+cd /usr/bin
+chmod +x kubeadm
+chmod +x kubelet
+chmod +x kubectl
+
+RELEASE_VERSION="v0.2.7"
+curl -sSL "https://raw.githubusercontent.com/kubernetes/release/${RELEASE_VERSION}/cmd/kubepkg/templates/latest/deb/kubelet/lib/systemd/system/kubelet.service" > /etc/systemd/system/kubelet.service
+mkdir -p /etc/systemd/system/kubelet.service.d
+curl -sSL "https://raw.githubusercontent.com/kubernetes/release/${RELEASE_VERSION}/cmd/kubepkg/templates/latest/deb/kubeadm/10-kubeadm.conf" > /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
 
 # Start and Enable kubelet service
-echo "[TASK 10] Enable and start kubelet service"
+echo "[TASK 9] Enable and start kubelet service"
 systemctl enable kubelet >/dev/null 2>&1
 systemctl start kubelet >/dev/null 2>&1
 
 # Enable ssh password authentication
-echo "[TASK 11] Enable ssh password authentication"
+echo "[TASK 10] Enable ssh password authentication"
 sed -i 's/^PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
 systemctl reload sshd
 
 # Set Root password
-echo "[TASK 12] Set root password"
+echo "[TASK 11] Set root password"
 echo "kubeadmin" | passwd --stdin root >/dev/null 2>&1
 
 # Update vagrant user's bashrc file

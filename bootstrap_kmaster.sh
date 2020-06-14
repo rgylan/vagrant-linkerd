@@ -23,15 +23,15 @@ echo "[TASK 4] Generate and save cluster join command to /joincluster.sh"
 kubeadm token create --print-join-command > /joincluster.sh
 
 # Expose docker API with TLS
-echo "[TASK 5] Expose docker API with TLS"
-mkdir /etc/systemd/system/docker.service.d
-bash -c 'cat >>/etc/systemd/system/docker.service.d/startup_options.conf<<EOF
-[Service]
-ExecStart=
-ExecStart=/usr/bin/dockerd -H fd:// -H tcp://0.0.0.0:2376 --tlsverify --tlscacert=/vagrant/tls/ca.pem --tlscert=/vagrant/tls/server-cert.pem --tlskey=/vagrant/tls/server-key.pem
-EOF'
+#echo "[TASK 5] Expose docker API with TLS"
+#mkdir /etc/systemd/system/docker.service.d
+#bash -c 'cat >>/etc/systemd/system/docker.service.d/startup_options.conf<<EOF
+#[Service]
+#ExecStart=
+#ExecStart=/usr/bin/dockerd -H fd:// -H tcp://0.0.0.0:2376 --tlsverify --tlscacert=/vagrant/tls/ca.pem --tlscert=/vagrant/tls/server-cert.pem --tlskey=/vagrant/tls/server-key.pem
+#EOF'
 
 # Restart docker
-echo "[TASK 6] Restart docker"
-systemctl daemon-reload
-systemctl restart docker.service
+#echo "[TASK 6] Restart docker"
+#systemctl daemon-reload
+#systemctl restart docker.service
